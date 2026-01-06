@@ -8,6 +8,8 @@ from api.transactions import transactions_bp
 from api.transfers import transfers_bp
 from api.investments import investments_bp
 from api.dashboard import dashboard_bp
+from api.exchange_rates import exchange_rates_bp
+from api.budgets import budgets_bp
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -48,6 +50,8 @@ def create_app(config_class=Config):
         app.register_blueprint(transfers_bp)
         app.register_blueprint(investments_bp)
         app.register_blueprint(dashboard_bp)
+        app.register_blueprint(exchange_rates_bp)
+        app.register_blueprint(budgets_bp)
 
     return app
 

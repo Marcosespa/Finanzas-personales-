@@ -2,12 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import StatCard from '../components/StatCard';
 import TransactionModal from '../components/TransactionModal';
+import CurrencyWidget from '../components/CurrencyWidget';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { useToast } from '../context/ToastContext';
 
 const Dashboard = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
+    const toast = useToast();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -16,6 +19,7 @@ const Dashboard = () => {
                 setData(res);
             } catch (err) {
                 console.error("Dashboard error", err);
+                toast.error('Error al cargar el dashboard');
             } finally {
                 setLoading(false);
             }
@@ -29,8 +33,10 @@ const Dashboard = () => {
             try {
                 const res = await api.get('/dashboard/');
                 setData(res);
+                toast.success('Dashboard actualizado');
             } catch (err) {
                 console.error(err);
+                toast.error('Error al actualizar');
             }
         };
         fetchData();
@@ -68,38 +74,44 @@ const Dashboard = () => {
 
             {/* Top Metrics Grid - 4 Columns */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-white">
-                <div className="card bg-gradient-to-br from-bg-secondary to-bg-tertiary border-t-2 border-accent-primary hover:translate-y-[-2px] transition-transform">
-                    <p className="text-muted text-xs font-bold uppercase tracking-widest mb-2">Patrimonio Neto</p>
-                    <p className="text-2xl font-bold text-white">{formatCurrency(metrics.net_worth)}</p>
-                    <p className="text-xs text-accent-success mt-1">Activos - Pasivos</p>
+                <div className="card bg-gradient-to-br from-bg-secondary via-bg-tertiary to-bg-secondary border-t-4 border-accent-primary hover:translate-y-[-4px] hover:shadow-glow transition-all duration-300 cursor-pointer group">
+                    <p className="text-muted text-xs font-bold uppercase tracking-widest mb-2 group-hover:text-accent-primary transition-colors">Patrimonio Neto</p>
+                    <p className="text-3xl font-bold text-white transition-transform group-hover:scale-105">{formatCurrency(metrics.net_worth)}</p>
+                    <p className="text-xs text-accent-success mt-2 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                        Activos - Pasivos
+                    </p>
                 </div>
-                <div className="card bg-gradient-to-br from-bg-secondary to-bg-tertiary border-t-2 border-success hover:translate-y-[-2px] transition-transform">
-                    <p className="text-muted text-xs font-bold uppercase tracking-widest mb-2">Liquidez (Efectivo)</p>
-                    <p className="text-2xl font-bold text-white">{formatCurrency(metrics.liquidity)}</p>
-                    <p className="text-xs text-muted mt-1">Disponible ahora</p>
+                <div className="card bg-gradient-to-br from-bg-secondary via-bg-tertiary to-bg-secondary border-t-4 border-success hover:translate-y-[-4px] hover:shadow-glow transition-all duration-300 cursor-pointer group">
+                    <p className="text-muted text-xs font-bold uppercase tracking-widest mb-2 group-hover:text-success transition-colors">Liquidez (Efectivo)</p>
+                    <p className="text-3xl font-bold text-white transition-transform group-hover:scale-105">{formatCurrency(metrics.liquidity)}</p>
+                    <p className="text-xs text-muted mt-2 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
+                        Disponible ahora
+                    </p>
                 </div>
-                <div className="card bg-gradient-to-br from-bg-secondary to-bg-tertiary border-t-2 border-accent-warning hover:translate-y-[-2px] transition-transform">
-                    <p className="text-muted text-xs font-bold uppercase tracking-widest mb-2">Inversiones</p>
-                    <p className="text-2xl font-bold text-white">{formatCurrency(metrics.portfolio_value)}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs ${metrics.unrealized_profit >= 0 ? 'text-accent-success' : 'text-accent-danger'}`}>
+                <div className="card bg-gradient-to-br from-bg-secondary via-bg-tertiary to-bg-secondary border-t-4 border-accent-warning hover:translate-y-[-4px] hover:shadow-glow transition-all duration-300 cursor-pointer group">
+                    <p className="text-muted text-xs font-bold uppercase tracking-widest mb-2 group-hover:text-accent-warning transition-colors">Inversiones</p>
+                    <p className="text-3xl font-bold text-white transition-transform group-hover:scale-105">{formatCurrency(metrics.portfolio_value)}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${metrics.unrealized_profit >= 0 ? 'bg-accent-success/20 text-accent-success' : 'bg-accent-danger/20 text-accent-danger'}`}>
                             {metrics.unrealized_profit > 0 ? '+' : ''}{formatCurrency(metrics.unrealized_profit)}
                         </span>
                     </div>
                 </div>
-                <div className="card bg-gradient-to-br from-bg-secondary to-bg-tertiary border-t-2 border-primary hover:translate-y-[-2px] transition-transform">
-                    <p className="text-muted text-xs font-bold uppercase tracking-widest mb-2">Tasa de Ahorro</p>
+                <div className="card bg-gradient-to-br from-bg-secondary via-bg-tertiary to-bg-secondary border-t-4 border-primary hover:translate-y-[-4px] hover:shadow-glow transition-all duration-300 cursor-pointer group">
+                    <p className="text-muted text-xs font-bold uppercase tracking-widest mb-2 group-hover:text-primary transition-colors">Tasa de Ahorro</p>
                     <div className="flex items-baseline gap-2">
-                        <p className="text-2xl font-bold text-white">{metrics.savings_rate.toFixed(1)}%</p>
+                        <p className="text-3xl font-bold text-white transition-transform group-hover:scale-105">{metrics.savings_rate.toFixed(1)}%</p>
+                        <span className="text-xs text-muted">del ingreso</span>
                     </div>
-                    <div className="w-full bg-bg-primary rounded-full h-1.5 mt-2 overflow-hidden">
-                        <div className="bg-primary h-full" style={{ width: `${Math.min(metrics.savings_rate, 100)}%` }}></div>
+                    <div className="w-full bg-bg-primary rounded-full h-2 mt-3 overflow-hidden">
+                        <div className={`h-full transition-all duration-1000 ${metrics.savings_rate > 20 ? 'bg-gradient-success' : 'bg-gradient-danger'}`} style={{ width: `${Math.min(metrics.savings_rate, 100)}%` }}></div>
                     </div>
-                    <p className="text-xs text-muted mt-1">Mes actual</p>
                 </div>
             </div>
 
-            {/* Row 2: Cashflow & Top Expenses */}
+            {/* Row 2: Cashflow, Top Expenses & Currency Widget */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Cashflow Chart (2/3) */}
                 <div className="lg:col-span-2 card">
@@ -145,26 +157,32 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* Top Expenses (1/3) */}
-                <div className="card">
-                    <h3 className="font-bold text-lg mb-4 text-accent-warning">Top Gastos (Mes)</h3>
-                    <div className="space-y-4">
-                        {top_expenses && top_expenses.map((exp, idx) => (
-                            <div key={idx} className="flex flex-col gap-1">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-white font-medium">{exp.category}</span>
-                                    <span className="text-muted">{formatCurrency(exp.amount)}</span>
+                {/* Sidebar: Top Expenses & Currency Widget */}
+                <div className="space-y-6">
+                    {/* Top Expenses */}
+                    <div className="card">
+                        <h3 className="font-bold text-lg mb-4 text-accent-warning">Top Gastos (Mes)</h3>
+                        <div className="space-y-4">
+                            {top_expenses && top_expenses.map((exp, idx) => (
+                                <div key={idx} className="flex flex-col gap-1">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-white font-medium">{exp.category}</span>
+                                        <span className="text-muted">{formatCurrency(exp.amount)}</span>
+                                    </div>
+                                    <div className="w-full bg-bg-tertiary rounded-full h-1.5 overflow-hidden">
+                                        <div
+                                            className="h-full bg-accent-warning rounded-full"
+                                            style={{ width: `${(exp.amount / metrics.monthly_expense) * 100}%` }}
+                                        ></div>
+                                    </div>
                                 </div>
-                                <div className="w-full bg-bg-tertiary rounded-full h-1.5 overflow-hidden">
-                                    <div
-                                        className="h-full bg-accent-warning rounded-full"
-                                        style={{ width: `${(exp.amount / metrics.monthly_expense) * 100}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-                        ))}
-                        {(!top_expenses || top_expenses.length === 0) && <p className="text-muted text-sm">No hay gastos este mes.</p>}
+                            ))}
+                            {(!top_expenses || top_expenses.length === 0) && <p className="text-muted text-sm">No hay gastos este mes.</p>}
+                        </div>
                     </div>
+
+                    {/* Currency Widget */}
+                    <CurrencyWidget />
                 </div>
             </div>
 
@@ -276,7 +294,12 @@ const Dashboard = () => {
                                                 <button
                                                     onClick={() => {
                                                         if (window.confirm('¿Eliminar esta transacción?')) {
-                                                            api.delete(`/transactions/${tx.id}`).then(() => reloadData());
+                                                            api.delete(`/transactions/${tx.id}`)
+                                                                .then(() => {
+                                                                    toast.success('Transacción eliminada');
+                                                                    reloadData();
+                                                                })
+                                                                .catch(() => toast.error('Error al eliminar'));
                                                         }
                                                     }}
                                                     className="text-muted hover:text-accent-danger transition-colors p-2 rounded hover:bg-accent-danger/10 opacity-0 group-hover:opacity-100"
