@@ -13,6 +13,7 @@ import Investments from './pages/Investments'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Budgets from './pages/Budgets'
+import AccountAudit from './pages/AccountAudit'
 
 function App() {
     return (
@@ -28,6 +29,7 @@ function App() {
                                 <Route index element={<Navigate to="/dashboard" replace />} />
                                 <Route path="dashboard" element={<Dashboard />} />
                                 <Route path="accounts" element={<Accounts />} />
+                                <Route path="audit" element={<AccountAudit />} />
                                 <Route path="budgets" element={<Budgets />} />
                                 <Route path="investments" element={<Investments />} />
                                 <Route path="reports" element={<Reports />} />

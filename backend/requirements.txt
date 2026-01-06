@@ -9,3 +9,5 @@ Flask-JWT-Extended
 flask-cors
 python-dotenv
 Flask-Limiter
+gunicorn
+requests

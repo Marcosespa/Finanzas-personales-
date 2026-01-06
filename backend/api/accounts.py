@@ -157,3 +157,221 @@ def delete_account(id):
     db.session.commit()
     
     return jsonify({"msg": "Account deleted"}), 200
+
+
+@accounts_bp.route('/<int:id>/transactions', methods=['GET'])
+@jwt_required()
+def get_account_transactions(id):
+    """
+    Get all transactions for a specific account with filters.
+    Query params:
+        - start_date: ISO date string (e.g., 2026-01-01)
+        - end_date: ISO date string
+        - category_id: Filter by category
+        - type: 'income' or 'expense'
+        - limit: Number of results (default 100)
+        - offset: Pagination offset
+    """
+    from datetime import datetime, timedelta
+    from models import Transaction, Category
+    from sqlalchemy import func
+    
+    user_id = get_jwt_identity()
+    account = Account.query.filter_by(id=id, user_id=user_id).first()
+    
+    if not account:
+        return jsonify({"msg": "Account not found"}), 404
+    
+    # Parse query params
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    category_id = request.args.get('category_id')
+    tx_type = request.args.get('type')  # income, expense
+    limit = int(request.args.get('limit', 100))
+    offset = int(request.args.get('offset', 0))
+    
+    # Build query
+    query = Transaction.query.filter(
+        Transaction.account_id == id,
+        Transaction.parent_id.is_(None),  # Only main transactions
+        Transaction.transfer_id.is_(None)  # Exclude transfers
+    )
+    
+    # Apply filters
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(Transaction.date >= start_dt)
+        except:
+            pass
+            
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date)
+            # Add 1 day to include the end date
+            end_dt = end_dt.replace(hour=23, minute=59, second=59)
+            query = query.filter(Transaction.date <= end_dt)
+        except:
+            pass
+            
+    if category_id:
+        query = query.filter(Transaction.category_id == int(category_id))
+        
+    if tx_type == 'income':
+        query = query.filter(Transaction.amount > 0)
+    elif tx_type == 'expense':
+        query = query.filter(Transaction.amount < 0)
+    
+    # Get total count before pagination
+    total_count = query.count()
+    
+    # Order and paginate
+    transactions = query.order_by(Transaction.date.desc()).offset(offset).limit(limit).all()
+    
+    # Calculate summary stats
+    all_txs = Transaction.query.filter(
+        Transaction.account_id == id,
+        Transaction.parent_id.is_(None),
+        Transaction.transfer_id.is_(None)
+    )
+    
+    if start_date:
+        try:
+            all_txs = all_txs.filter(Transaction.date >= datetime.fromisoformat(start_date))
+        except:
+            pass
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59)
+            all_txs = all_txs.filter(Transaction.date <= end_dt)
+        except:
+            pass
+    
+    all_txs = all_txs.all()
+    
+    total_income = sum(tx.amount for tx in all_txs if tx.amount > 0)
+    total_expense = sum(abs(tx.amount) for tx in all_txs if tx.amount < 0)
+    net_change = total_income - total_expense
+    
+    # Group by category for breakdown
+    category_breakdown = {}
+    for tx in all_txs:
+        if tx.amount < 0:  # Expenses only for breakdown
+            cat_name = tx.category.name if tx.category else 'Sin categoría'
+            category_breakdown[cat_name] = category_breakdown.get(cat_name, 0) + abs(tx.amount)
+    
+    # Sort by amount descending
+    category_breakdown_list = sorted(
+        [{'category': k, 'amount': v} for k, v in category_breakdown.items()],
+        key=lambda x: x['amount'],
+        reverse=True
+    )
+    
+    # Build response
+    result = []
+    for tx in transactions:
+        result.append({
+            "id": tx.id,
+            "amount": tx.amount,
+            "description": tx.description,
+            "date": tx.date.isoformat(),
+            "category": tx.category.name if tx.category else 'Sin categoría',
+            "category_id": tx.category_id,
+            "type": "income" if tx.amount > 0 else "expense",
+            "has_splits": len(tx.children) > 0
+        })
+    
+    return jsonify({
+        "account": {
+            "id": account.id,
+            "name": account.name,
+            "type": account.type.value,
+            "currency_code": account.currency_code,
+            "current_balance": account.balance
+        },
+        "transactions": result,
+        "summary": {
+            "total_income": total_income,
+            "total_expense": total_expense,
+            "net_change": net_change,
+            "transaction_count": total_count,
+            "category_breakdown": category_breakdown_list
+        },
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "total": total_count,
+            "has_more": offset + limit < total_count
+        }
+    }), 200
+
+
+@accounts_bp.route('/<int:id>/summary', methods=['GET'])
+@jwt_required()
+def get_account_summary(id):
+    """Get daily/weekly/monthly summary for an account"""
+    from datetime import datetime, timedelta
+    from models import Transaction
+    from sqlalchemy import func, extract
+    
+    user_id = get_jwt_identity()
+    account = Account.query.filter_by(id=id, user_id=user_id).first()
+    
+    if not account:
+        return jsonify({"msg": "Account not found"}), 404
+    
+    period = request.args.get('period', 'daily')  # daily, weekly, monthly
+    days = int(request.args.get('days', 30))  # Number of days to look back
+    
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    transactions = Transaction.query.filter(
+        Transaction.account_id == id,
+        Transaction.date >= start_date,
+        Transaction.parent_id.is_(None),
+        Transaction.transfer_id.is_(None)
+    ).order_by(Transaction.date).all()
+    
+    # Group by period
+    grouped_data = {}
+    
+    for tx in transactions:
+        if period == 'daily':
+            key = tx.date.strftime('%Y-%m-%d')
+        elif period == 'weekly':
+            # Get Monday of the week
+            monday = tx.date - timedelta(days=tx.date.weekday())
+            key = monday.strftime('%Y-%m-%d')
+        else:  # monthly
+            key = tx.date.strftime('%Y-%m')
+        
+        if key not in grouped_data:
+            grouped_data[key] = {'income': 0, 'expense': 0, 'transactions': 0}
+        
+        if tx.amount > 0:
+            grouped_data[key]['income'] += tx.amount
+        else:
+            grouped_data[key]['expense'] += abs(tx.amount)
+        grouped_data[key]['transactions'] += 1
+    
+    # Convert to list
+    result = [
+        {
+            'period': k,
+            'income': v['income'],
+            'expense': v['expense'],
+            'net': v['income'] - v['expense'],
+            'transactions': v['transactions']
+        }
+        for k, v in sorted(grouped_data.items())
+    ]
+    
+    return jsonify({
+        "account": {
+            "id": account.id,
+            "name": account.name,
+            "current_balance": account.balance
+        },
+        "period_type": period,
+        "data": result
+    }), 200

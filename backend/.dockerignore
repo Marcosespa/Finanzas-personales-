@@ -1,0 +1,39 @@
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Database (we mount this as a volume)
+instance/
+*.db
+*.sqlite
+
+# IDE
+.idea/
+.vscode/
+
+# Git
+.git
+.gitignore
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Tests
+tests/
+pytest.ini
+
+# Docs
+*.md
+
+
+

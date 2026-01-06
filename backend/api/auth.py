@@ -5,6 +5,11 @@ from flask_jwt_extended import create_access_token, create_refresh_token, jwt_re
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
+@auth_bp.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for Docker/load balancers"""
+    return jsonify({"status": "healthy", "service": "finanzas-api"}), 200
+
 @auth_bp.route('/register', methods=['POST'])
 @limiter.limit("5 per minute")
 def register():

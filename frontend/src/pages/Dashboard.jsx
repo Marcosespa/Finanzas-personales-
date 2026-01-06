@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import StatCard from '../components/StatCard';
 import TransactionModal from '../components/TransactionModal';
 import CurrencyWidget from '../components/CurrencyWidget';
+import TripCountdown from '../components/TripCountdown';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { useToast } from '../context/ToastContext';
 
@@ -157,27 +158,42 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                {/* Sidebar: Top Expenses & Currency Widget */}
+                {/* Sidebar: Trip Countdown, Top Expenses & Currency Widget */}
                 <div className="space-y-6">
+                    {/* Trip Countdown */}
+                    <TripCountdown 
+                        targetDate="2026-02-01"
+                        destination="Praga"
+                        savingsGoal={15000000}
+                        currentSavings={metrics.liquidity + metrics.portfolio_value}
+                    />
+
                     {/* Top Expenses */}
                     <div className="card">
-                        <h3 className="font-bold text-lg mb-4 text-accent-warning">Top Gastos (Mes)</h3>
+                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
+                            <span className="text-accent-warning">Top Gastos</span>
+                        </h3>
                         <div className="space-y-4">
                             {top_expenses && top_expenses.map((exp, idx) => (
-                                <div key={idx} className="flex flex-col gap-1">
+                                <div key={idx} className="flex flex-col gap-1 group">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-white font-medium">{exp.category}</span>
+                                        <span className="text-white font-medium group-hover:text-accent-warning transition-colors">{exp.category}</span>
                                         <span className="text-muted">{formatCurrency(exp.amount)}</span>
                                     </div>
                                     <div className="w-full bg-bg-tertiary rounded-full h-1.5 overflow-hidden">
                                         <div
-                                            className="h-full bg-accent-warning rounded-full"
+                                            className="h-full bg-gradient-to-r from-amber-500 to-orange-600 rounded-full transition-all duration-500"
                                             style={{ width: `${(exp.amount / metrics.monthly_expense) * 100}%` }}
                                         ></div>
                                     </div>
                                 </div>
                             ))}
-                            {(!top_expenses || top_expenses.length === 0) && <p className="text-muted text-sm">No hay gastos este mes.</p>}
+                            {(!top_expenses || top_expenses.length === 0) && <p className="text-muted text-sm text-center py-4">No hay gastos este mes.</p>}
                         </div>
                     </div>
 

@@ -129,6 +129,9 @@ class Budget(BaseModel):
     period = db.Column(db.String(20), default='monthly') # monthly, yearly
     start_date = db.Column(db.DateTime, default=datetime.utcnow)
     end_date = db.Column(db.DateTime, nullable=True)
+    
+    # Relationship
+    category = db.relationship('Category', backref='budgets', lazy=True)
 
 class Rule(BaseModel):
     __tablename__ = 'rules'
