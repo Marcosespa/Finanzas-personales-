@@ -10,6 +10,9 @@ from api.investments import investments_bp
 from api.dashboard import dashboard_bp
 from api.exchange_rates import exchange_rates_bp
 from api.budgets import budgets_bp
+from api.savings_goals import savings_goals_bp
+from api.recurring import recurring_bp
+from api.export import export_bp
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -32,13 +35,20 @@ def create_app(config_class=Config):
         print(f"DEBUG: JWT Missing Token: {error}")
         return jsonify({"msg": f"Missing token: {error}"}), 401
 
-    cors.init_app(app)
+    # CORS configuration - Allow all origins and methods for development
+    cors.init_app(app, 
+        resources={r"/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }}
+    )
     limiter.init_app(app)
 
     with app.app_context():
         # Import models so Alembic can detect them
         # We import * to ensure all models are registered
-        from models import User, Account, CreditCard, Transaction, Transfer, Category, Investment, InvestmentPriceHistory, ExchangeRate, Budget, Rule
+        from models import User, Account, CreditCard, Transaction, Transfer, Category, Investment, InvestmentPriceHistory, ExchangeRate, Budget, Rule, SavingsGoal, RecurringTransaction
         
         # Placeholder for Routes
         # from api import register_routes
@@ -52,6 +62,9 @@ def create_app(config_class=Config):
         app.register_blueprint(dashboard_bp)
         app.register_blueprint(exchange_rates_bp)
         app.register_blueprint(budgets_bp)
+        app.register_blueprint(savings_goals_bp)
+        app.register_blueprint(recurring_bp)
+        app.register_blueprint(export_bp)
 
     return app
 

@@ -12,3 +12,8 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(basedir, 'finance.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # CORS Configuration for development
+    CORS_ORIGINS = "*"  # Allow all origins in development
+    CORS_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    CORS_ALLOW_HEADERS = ["Content-Type", "Authorization"]

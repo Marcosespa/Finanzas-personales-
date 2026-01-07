@@ -19,7 +19,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
             {/* Backdrop */}
             <div 
                 className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
@@ -27,13 +27,18 @@ const Modal = ({ isOpen, onClose, title, children }) => {
             />
             
             {/* Modal Content */}
-            <div className="relative bg-bg-secondary rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-border-color/50 animate-modal-in">
+            <div className="relative bg-bg-secondary w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden border-t sm:border border-border-color/50 animate-modal-in max-h-[90vh] sm:max-h-[85vh] flex flex-col">
                 {/* Glow effect */}
                 <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-primary/50 to-transparent" />
                 
+                {/* Mobile handle indicator */}
+                <div className="sm:hidden flex justify-center pt-3 pb-1">
+                    <div className="w-10 h-1 bg-border-color rounded-full" />
+                </div>
+                
                 {/* Header */}
-                <div className="flex justify-between items-center p-5 border-b border-border-color/50">
-                    <h3 className="text-lg font-bold text-white">{title}</h3>
+                <div className="flex justify-between items-center p-4 sm:p-5 border-b border-border-color/50 flex-shrink-0">
+                    <h3 className="text-base sm:text-lg font-bold text-white">{title}</h3>
                     <button 
                         onClick={onClose} 
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-white hover:bg-bg-tertiary transition-all"
@@ -45,7 +50,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
                 </div>
                 
                 {/* Body */}
-                <div className="p-5 max-h-[70vh] overflow-y-auto">
+                <div className="p-4 sm:p-5 overflow-y-auto flex-1">
                     {children}
                 </div>
             </div>
@@ -55,15 +60,27 @@ const Modal = ({ isOpen, onClose, title, children }) => {
                 @keyframes modal-in {
                     from {
                         opacity: 0;
-                        transform: scale(0.95) translateY(10px);
+                        transform: translateY(100%);
                     }
                     to {
                         opacity: 1;
-                        transform: scale(1) translateY(0);
+                        transform: translateY(0);
+                    }
+                }
+                @media (min-width: 640px) {
+                    @keyframes modal-in {
+                        from {
+                            opacity: 0;
+                            transform: scale(0.95) translateY(10px);
+                        }
+                        to {
+                            opacity: 1;
+                            transform: scale(1) translateY(0);
+                        }
                     }
                 }
                 .animate-modal-in {
-                    animation: modal-in 0.2s ease-out;
+                    animation: modal-in 0.25s ease-out;
                 }
             `}</style>
         </div>

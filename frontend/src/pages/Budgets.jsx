@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/Modal';
+import { formatNumberWithThousands, parseFormattedNumber } from '../utils/currency';
 
 const Budgets = () => {
     const [budgets, setBudgets] = useState([]);
@@ -61,7 +62,7 @@ const Budgets = () => {
         setEditingBudget(budget);
         setFormData({
             category_id: budget.category_id,
-            amount: budget.amount,
+            amount: formatNumberWithThousands(budget.amount || 0, 'COP'),
             period: budget.period
         });
         setIsModalOpen(true);
@@ -71,11 +72,17 @@ const Budgets = () => {
         e.preventDefault();
 
         try {
+            // Parsear el amount formateado antes de enviar
+            const payload = {
+                ...formData,
+                amount: parseFloat(parseFormattedNumber(formData.amount))
+            };
+            
             if (editingBudget) {
-                await api.put(`/budgets/${editingBudget.id}`, formData);
+                await api.put(`/budgets/${editingBudget.id}`, payload);
                 toast.success('Presupuesto actualizado');
             } else {
-                await api.post('/budgets/', formData);
+                await api.post('/budgets/', payload);
                 toast.success('Presupuesto creado');
             }
 
@@ -356,8 +363,7 @@ const Budgets = () => {
                             <h4 className="font-bold text-accent-warning mb-1">Consejo para tu viaje</h4>
                             <p className="text-sm text-muted">
                                 Algunos presupuestos están cerca del límite o excedidos. Revisa tus gastos para 
-                                asegurar que tengas suficiente para tu pasantía en Praga. Recuerda que necesitas 
-                                ahorrar para el viaje.
+                                asegurar que tengas suficiente para tus objetivos. Recuerda mantener un fondo de emergencia.
                             </p>
                         </div>
                     </div>
@@ -391,13 +397,22 @@ const Budgets = () => {
                         <div className="relative">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">$</span>
                             <input
-                                type="number"
+                                type="text"
                                 required
                                 value={formData.amount}
-                                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                placeholder="500,000"
-                                min="0"
-                                step="10000"
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    // Permitir solo números y punto decimal
+                                    const cleaned = value.replace(/[^\d.]/g, '');
+                                    if (cleaned === '' || cleaned === '.') {
+                                        setFormData({ ...formData, amount: '' });
+                                        return;
+                                    }
+                                    // Formatear con puntos para miles
+                                    const formatted = formatNumberWithThousands(cleaned, 'COP');
+                                    setFormData({ ...formData, amount: formatted });
+                                }}
+                                placeholder="500.000"
                                 className="w-full pl-8"
                             />
                         </div>

@@ -166,7 +166,9 @@ def get_dashboard():
             "description": t.description,
             "amount": t.amount,
             "category": t.category.name if t.category else "Uncategorized",
+            "category_id": t.category_id,
             "account": t.account.name,
+            "account_id": t.account_id,
             "type": "income" if t.amount > 0 else "expense"
         } for t in txs[:10]] 
     }), 200

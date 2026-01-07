@@ -11,3 +11,4 @@ python-dotenv
 Flask-Limiter
 gunicorn
 requests
+python-dateutil

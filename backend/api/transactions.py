@@ -53,28 +53,229 @@ def create_transaction():
 @jwt_required()
 def get_transactions():
     user_id = get_jwt_identity()
-    # Basic pagination and filtering could go here
-    # For now, return all (optimize later)
-    # Join with Account to filter by user
     from models import Account
     
     txs = Transaction.query.join(Account).filter(Account.user_id == user_id).order_by(Transaction.date.desc()).limit(50).all()
     
     result = []
     for tx in txs:
-        if tx.parent_id is None: # Show only main transactions or standalone
+        if tx.parent_id is None:
             result.append({
                 "id": tx.id,
                 "amount": tx.amount,
                 "description": tx.description,
                 "date": tx.date.isoformat(),
+                "account_id": tx.account_id,
                 "account_name": tx.account.name,
+                "category_id": tx.category_id,
+                "category_name": tx.category.name if tx.category else None,
                 "splits_count": len(tx.children)
             })
             
     return jsonify(result), 200
+
+@transactions_bp.route('/search', methods=['GET'])
+@jwt_required()
+def search_transactions():
+    """Search transactions with filters"""
+    user_id = get_jwt_identity()
+    from models import Account, Category
+    from sqlalchemy import or_
+    
+    # Get search params
+    query_str = request.args.get('q', '').strip()
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    min_amount = request.args.get('min_amount')
+    max_amount = request.args.get('max_amount')
+    account_id = request.args.get('account_id')
+    category_id = request.args.get('category_id')
+    tx_type = request.args.get('type')  # income, expense
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 50))
+    
+    # Build query
+    query = Transaction.query.join(Account).filter(
+        Account.user_id == user_id,
+        Transaction.deleted_at == None,
+        Transaction.parent_id == None
+    )
+    
+    # Text search
+    if query_str:
+        query = query.outerjoin(Category).filter(
+            or_(
+                Transaction.description.ilike(f'%{query_str}%'),
+                Category.name.ilike(f'%{query_str}%'),
+                Account.name.ilike(f'%{query_str}%')
+            )
+        )
+    
+    # Date filters
+    if start_date:
+        try:
+            start = datetime.fromisoformat(start_date)
+            query = query.filter(Transaction.date >= start)
+        except:
+            pass
+    
+    if end_date:
+        try:
+            end = datetime.fromisoformat(end_date)
+            query = query.filter(Transaction.date <= end)
+        except:
+            pass
+    
+    # Amount filters
+    if min_amount:
+        try:
+            min_val = float(min_amount)
+            query = query.filter(
+                or_(Transaction.amount >= min_val, Transaction.amount <= -min_val)
+            )
+        except:
+            pass
+    
+    if max_amount:
+        try:
+            max_val = float(max_amount)
+            query = query.filter(
+                Transaction.amount <= max_val,
+                Transaction.amount >= -max_val
+            )
+        except:
+            pass
+    
+    # Account filter
+    if account_id:
+        query = query.filter(Transaction.account_id == int(account_id))
+    
+    # Category filter
+    if category_id:
+        query = query.filter(Transaction.category_id == int(category_id))
+    
+    # Type filter
+    if tx_type == 'income':
+        query = query.filter(Transaction.amount > 0)
+    elif tx_type == 'expense':
+        query = query.filter(Transaction.amount < 0)
+    
+    # Get total count
+    total = query.count()
+    
+    # Paginate
+    txs = query.order_by(Transaction.date.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    
+    return jsonify({
+        "transactions": [{
+            "id": tx.id,
+            "amount": tx.amount,
+            "description": tx.description,
+            "date": tx.date.isoformat(),
+            "account_id": tx.account_id,
+            "account_name": tx.account.name,
+            "category_id": tx.category_id,
+            "category_name": tx.category.name if tx.category else None
+        } for tx in txs],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page
+    }), 200
+
+@transactions_bp.route('/<int:id>', methods=['GET'])
+@jwt_required()
+def get_transaction(id):
+    """Get a single transaction by ID"""
+    user_id = get_jwt_identity()
+    from models import Account
+    
+    tx = Transaction.query.join(Account).filter(
+        Transaction.id == id, 
+        Account.user_id == user_id
+    ).first()
+    
+    if not tx:
+        return jsonify({"msg": "Transaction not found"}), 404
+    
+    return jsonify({
+        "id": tx.id,
+        "amount": tx.amount,
+        "description": tx.description,
+        "date": tx.date.isoformat(),
+        "account_id": tx.account_id,
+        "account_name": tx.account.name,
+        "category_id": tx.category_id,
+        "category_name": tx.category.name if tx.category else None
+    }), 200
+
+@transactions_bp.route('/<int:id>', methods=['PUT'])
+@jwt_required()
+def update_transaction(id):
+    """Update an existing transaction"""
+    user_id = get_jwt_identity()
+    from models import Account
+    
+    tx = Transaction.query.join(Account).filter(
+        Transaction.id == id, 
+        Account.user_id == user_id
+    ).first()
+    
+    if not tx:
+        return jsonify({"msg": "Transaction not found"}), 404
+    
+    data = request.get_json()
+    
+    try:
+        # Get the old amount to adjust account balance
+        old_amount = tx.amount
+        old_account_id = tx.account_id
+        
+        # Update fields
+        if 'amount' in data:
+            tx.amount = data['amount']
+        if 'description' in data:
+            tx.description = data['description']
+        if 'date' in data:
+            tx.date = datetime.fromisoformat(data['date']) if data['date'] else tx.date
+        if 'category_id' in data:
+            tx.category_id = data['category_id'] if data['category_id'] else None
+        if 'account_id' in data and data['account_id'] != old_account_id:
+            # Verify new account belongs to user
+            new_account = Account.query.filter_by(id=data['account_id'], user_id=user_id).first()
+            if not new_account:
+                return jsonify({"msg": "Account not found"}), 404
             
-    return jsonify(result), 200
+            # Revert balance from old account
+            old_account = Account.query.get(old_account_id)
+            if old_account:
+                old_account.balance -= old_amount
+            
+            # Apply to new account
+            new_account.balance += tx.amount
+            tx.account_id = data['account_id']
+        else:
+            # Same account, just adjust for amount change
+            if 'amount' in data:
+                account = Account.query.get(tx.account_id)
+                if account:
+                    # Remove old amount, add new amount
+                    account.balance = account.balance - old_amount + tx.amount
+        
+        db.session.commit()
+        return jsonify({
+            "msg": "Transaction updated", 
+            "id": tx.id,
+            "amount": tx.amount,
+            "description": tx.description,
+            "date": tx.date.isoformat(),
+            "account_id": tx.account_id,
+            "category_id": tx.category_id
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"msg": "Error updating transaction", "error": str(e)}), 500
 
 @transactions_bp.route('/<int:id>', methods=['DELETE'])
 @jwt_required()

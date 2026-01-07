@@ -154,3 +154,51 @@ def get_budget_status():
         })
     
     return jsonify(result), 200
+
+@budgets_bp.route('/alerts', methods=['GET'])
+@jwt_required()
+def get_budget_alerts():
+    """Get budget alerts (over 80% or over limit)"""
+    user_id = get_jwt_identity()
+    
+    from models import Transaction, Account
+    from datetime import datetime
+    
+    today = datetime.utcnow()
+    month_start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    budgets = Budget.query.filter_by(user_id=user_id).all()
+    
+    alerts = []
+    for budget in budgets:
+        txs = Transaction.query.join(Account).filter(
+            Account.user_id == user_id,
+            Transaction.category_id == budget.category_id,
+            Transaction.date >= month_start,
+            Transaction.amount < 0,
+            Transaction.transfer_id == None
+        ).all()
+        
+        actual = sum(abs(tx.amount) for tx in txs)
+        utilization = (actual / budget.amount) * 100 if budget.amount > 0 else 0
+        
+        if utilization >= 100:
+            alerts.append({
+                'type': 'danger',
+                'category': budget.category.name if budget.category else 'Unknown',
+                'message': f'¡Presupuesto excedido! Has gastado {utilization:.0f}% de tu límite en {budget.category.name}',
+                'utilization': utilization,
+                'actual': actual,
+                'limit': budget.amount
+            })
+        elif utilization >= 80:
+            alerts.append({
+                'type': 'warning',
+                'category': budget.category.name if budget.category else 'Unknown',
+                'message': f'Alerta: Has gastado {utilization:.0f}% de tu presupuesto en {budget.category.name}',
+                'utilization': utilization,
+                'actual': actual,
+                'limit': budget.amount
+            })
+    
+    return jsonify(alerts), 200

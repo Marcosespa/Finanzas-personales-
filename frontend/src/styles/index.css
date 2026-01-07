@@ -273,6 +273,44 @@ select:focus {
   .sm\:grid-cols-2 {
     grid-template-columns: repeat(2, 1fr);
   }
+  
+  .sm\:grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .md\:grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .md\:grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .md\:grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .md\:flex-row {
+    flex-direction: row;
+  }
+
+  .md\:items-center {
+    align-items: center;
+  }
+
+  .md\:items-end {
+    align-items: flex-end;
+  }
+
+  .md\:gap-4 {
+    gap: var(--space-4);
+  }
+
+  .md\:text-left {
+    text-align: left;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -286,6 +324,44 @@ select:focus {
 
   .lg\:grid-cols-2 {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .lg\:grid-cols-5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .lg\:flex-row {
+    flex-direction: row;
+  }
+
+  .lg\:items-center {
+    align-items: center;
+  }
+
+  .lg\:items-end {
+    align-items: flex-end;
+  }
+
+  .lg\:col-span-2 {
+    grid-column: span 2 / span 2;
+  }
+
+  .lg\:col-span-3 {
+    grid-column: span 3 / span 3;
+  }
+}
+
+@media (min-width: 1280px) {
+  .xl\:grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .xl\:grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .xl\:grid-cols-5 {
+    grid-template-columns: repeat(5, 1fr);
   }
 }
 
@@ -653,9 +729,68 @@ select:focus {
 }
 
 /* Responsive Utilities */
+@media (max-width: 639px) {
+  /* Mobile-first adjustments */
+  .card {
+    padding: var(--space-4);
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  .btn {
+    padding: var(--space-2) var(--space-4);
+    font-size: 0.875rem;
+  }
+
+  /* Stack filters vertically on mobile */
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+
+  /* Full width buttons on mobile */
+  .mobile-full {
+    width: 100%;
+  }
+
+  /* Hide on mobile */
+  .hide-mobile {
+    display: none !important;
+  }
+
+  /* Smaller text on mobile */
+  .text-3xl {
+    font-size: 1.5rem;
+  }
+
+  .text-2xl {
+    font-size: 1.25rem;
+  }
+}
+
+@media (min-width: 640px) {
+  /* Show on tablet+ */
+  .show-mobile {
+    display: none !important;
+  }
+}
+
 @media (min-width: 768px) {
   .md\:hidden {
     display: none;
+  }
+
+  .md\:block {
+    display: block;
+  }
+
+  .md\:flex {
+    display: flex;
   }
 
   .md\:relative {
@@ -671,12 +806,54 @@ select:focus {
     padding: 2.5rem;
   }
 
+  .md\:p-6 {
+    padding: 1.5rem;
+  }
+
   .md\:pt-0 {
     padding-top: 0;
   }
 
   .md\:h-auto {
     height: auto;
+  }
+
+  .md\:w-auto {
+    width: auto;
+  }
+
+  .md\:flex-row {
+    flex-direction: row;
+  }
+
+  .md\:flex-nowrap {
+    flex-wrap: nowrap;
+  }
+
+  .md\:justify-between {
+    justify-content: space-between;
+  }
+
+  .md\:gap-6 {
+    gap: 1.5rem;
+  }
+
+  .md\:text-base {
+    font-size: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .lg\:hidden {
+    display: none;
+  }
+
+  .lg\:block {
+    display: block;
+  }
+
+  .lg\:flex {
+    display: flex;
   }
 }
 
@@ -907,3 +1084,126 @@ select:focus {
 .stagger-children > *:nth-child(4) { animation-delay: 150ms; }
 .stagger-children > *:nth-child(5) { animation-delay: 200ms; }
 .stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+
+/* ===== RESPONSIVE ENHANCEMENTS ===== */
+
+/* Safe area padding for mobile devices with notches */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-all {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Scroll snap for horizontal scrolling carousels on mobile */
+.scroll-snap-x {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+.scroll-snap-item {
+  scroll-snap-align: start;
+}
+
+/* Touch-friendly tap targets on touch devices */
+@media (pointer: coarse) {
+  button, 
+  .btn,
+  select,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 44px;
+  }
+  
+  /* Larger touch targets for select dropdowns */
+  select {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+}
+
+/* Better text scaling for small screens */
+@media (max-width: 360px) {
+  :root {
+    font-size: 14px;
+  }
+  
+  h1 {
+    font-size: 1.35rem;
+  }
+  
+  h2 {
+    font-size: 1.15rem;
+  }
+  
+  .text-3xl {
+    font-size: 1.35rem;
+  }
+  
+  .text-2xl {
+    font-size: 1.15rem;
+  }
+}
+
+/* Landscape mobile optimization */
+@media (max-height: 500px) and (orientation: landscape) {
+  .modal-content {
+    max-height: 80vh;
+  }
+  
+  .card {
+    padding: var(--space-3);
+  }
+}
+
+/* Hide scrollbars on mobile while keeping scroll functionality */
+@media (max-width: 768px) {
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Prevent text selection on interactive elements (mobile UX) */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Improve text readability on small screens */
+@media (max-width: 640px) {
+  .readable-text {
+    font-size: 16px; /* Prevents iOS zoom on input focus */
+    line-height: 1.6;
+  }
+  
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* Prevents iOS zoom on input focus */
+  }
+}
+
+/* Responsive text alignment */
+.text-center-mobile {
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .text-center-mobile {
+    text-align: left;
+  }
+}

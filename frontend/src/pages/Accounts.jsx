@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import Modal from '../components/Modal';
-import { formatCurrency } from '../utils/currency';
+import { formatCurrency, formatNumberWithThousands, parseFormattedNumber } from '../utils/currency';
+import { useToast } from '../context/ToastContext';
 
 const Accounts = () => {
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const toast = useToast();
 
     const [formData, setFormData] = useState({
         name: '',
@@ -45,9 +48,9 @@ const Accounts = () => {
             type: account.type, // Note: type usually isn't editable to prevent data corruption, but we'll show it
             institution: account.institution || '',
             currency_code: account.currency_code,
-            balance: account.balance,
+            balance: formatNumberWithThousands(account.balance || 0, account.currency_code),
             // Pre-fill credit data if applicable
-            credit_limit: account.credit_card?.credit_limit || 0,
+            credit_limit: formatNumberWithThousands(account.credit_card?.credit_limit || 0, account.currency_code),
             billing_day: account.credit_card?.billing_day || 1,
             payment_due_day: account.credit_card?.payment_due_day || 15,
             interest_rate: account.credit_card?.interest_rate || 0
@@ -60,8 +63,8 @@ const Accounts = () => {
         setEditingAccount(null);
         // Reset form to defaults
         setFormData({
-            name: '', type: 'bank', institution: '', currency_code: 'COP', balance: 0,
-            credit_limit: 0, billing_day: 1, payment_due_day: 15, interest_rate: 0
+            name: '', type: 'bank', institution: '', currency_code: 'COP', balance: '',
+            credit_limit: '', billing_day: 1, payment_due_day: 15, interest_rate: 0
         });
     };
 
@@ -78,7 +81,7 @@ const Accounts = () => {
 
         if (formData.type === 'credit') {
             payload.credit_card = {
-                credit_limit: parseFloat(formData.credit_limit),
+                credit_limit: parseFloat(parseFormattedNumber(formData.credit_limit)),
                 billing_day: parseInt(formData.billing_day),
                 payment_due_day: parseInt(formData.payment_due_day),
                 interest_rate: parseFloat(formData.interest_rate)
@@ -89,19 +92,24 @@ const Accounts = () => {
         if (!editingAccount) {
             payload.type = formData.type;
             payload.currency_code = formData.currency_code;
-            payload.balance = parseFloat(formData.balance);
+            payload.balance = parseFloat(parseFormattedNumber(formData.balance));
         }
 
+        setSubmitting(true);
         try {
             if (editingAccount) {
                 await api.put(`/accounts/${editingAccount.id}`, payload);
+                toast.success('Cuenta actualizada exitosamente');
             } else {
                 await api.post('/accounts/', payload);
+                toast.success('Cuenta creada exitosamente');
             }
             handleCloseModal();
             fetchAccounts(); // Refresh list
         } catch (err) {
-            alert("Error saving account: " + (err.msg || err));
+            toast.error(err.message || 'Error al guardar la cuenta');
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -218,10 +226,63 @@ const Accounts = () => {
                         </div>
                     </div>
 
+                    <div>
+                        <label className="block text-sm mb-1 text-muted">Divisa / Currency</label>
+                        {!editingAccount ? (
+                            <select 
+                                className="w-full bg-tertiary text-primary" 
+                                value={formData.currency_code} 
+                                onChange={e => {
+                                    const newCurrency = e.target.value;
+                                    // Reformatear el balance si existe cuando se cambia la divisa
+                                    if (formData.balance) {
+                                        const parsed = parseFormattedNumber(formData.balance);
+                                        if (parsed) {
+                                            const reformatted = formatNumberWithThousands(parsed, newCurrency);
+                                            setFormData({ ...formData, currency_code: newCurrency, balance: reformatted });
+                                        } else {
+                                            setFormData({ ...formData, currency_code: newCurrency });
+                                        }
+                                    } else {
+                                        setFormData({ ...formData, currency_code: newCurrency });
+                                    }
+                                }}
+                            >
+                                <option value="COP">🇨🇴 Peso Colombiano (COP)</option>
+                                <option value="CZK">🇨🇿 Corona Checa (CZK)</option>
+                                <option value="EUR">🇪🇺 Euro (EUR)</option>
+                                <option value="USD">🇺🇸 Dólar (USD)</option>
+                            </select>
+                        ) : (
+                            <input 
+                                type="text" 
+                                className="w-full bg-tertiary text-primary disabled:opacity-50" 
+                                value={`${formData.currency_code === 'COP' ? '🇨🇴' : formData.currency_code === 'CZK' ? '🇨🇿' : formData.currency_code === 'EUR' ? '🇪🇺' : '🇺🇸'} ${formData.currency_code}`}
+                                disabled
+                            />
+                        )}
+                    </div>
+
                     {!editingAccount && (
                         <div>
                             <label className="block text-sm mb-1 text-muted">Initial Balance</label>
-                            <input type="number" step="0.01" className="w-full bg-tertiary text-primary" value={formData.balance} onChange={e => setFormData({ ...formData, balance: e.target.value })} />
+                            <input 
+                                type="text" 
+                                className="w-full bg-tertiary text-primary" 
+                                value={formData.balance} 
+                                onChange={e => {
+                                    const value = e.target.value;
+                                    // Permitir solo números y punto decimal
+                                    const cleaned = value.replace(/[^\d.]/g, '');
+                                    if (cleaned === '' || cleaned === '.') {
+                                        setFormData({ ...formData, balance: '' });
+                                        return;
+                                    }
+                                    // Formatear con puntos para miles
+                                    const formatted = formatNumberWithThousands(cleaned, formData.currency_code);
+                                    setFormData({ ...formData, balance: formatted });
+                                }} 
+                            />
                         </div>
                     )}
 
@@ -230,7 +291,23 @@ const Accounts = () => {
                             <h4 className="font-semibold text-sm text-accent-primary">Credit Details</h4>
                             <div>
                                 <label className="block text-sm mb-1 text-muted">Credit Limit</label>
-                                <input type="number" className="w-full bg-tertiary text-primary" value={formData.credit_limit} onChange={e => setFormData({ ...formData, credit_limit: e.target.value })} />
+                                <input 
+                                    type="text" 
+                                    className="w-full bg-tertiary text-primary" 
+                                    value={formData.credit_limit} 
+                                    onChange={e => {
+                                        const value = e.target.value;
+                                        // Permitir solo números y punto decimal
+                                        const cleaned = value.replace(/[^\d.]/g, '');
+                                        if (cleaned === '' || cleaned === '.') {
+                                            setFormData({ ...formData, credit_limit: '' });
+                                            return;
+                                        }
+                                        // Formatear con puntos para miles
+                                        const formatted = formatNumberWithThousands(cleaned, formData.currency_code);
+                                        setFormData({ ...formData, credit_limit: formatted });
+                                    }} 
+                                />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>

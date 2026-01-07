@@ -19,7 +19,10 @@ const Login = () => {
             login(res.user, res.access_token);
             navigate('/dashboard');
         } catch (err) {
-            setError(err.msg || 'Credenciales incorrectas');
+            // Handle error message - could be err.message or err.msg or err.data.msg
+            const errorMessage = err.message || err.msg || (err.data && err.data.msg) || 'Credenciales incorrectas';
+            setError(errorMessage);
+            console.error('Login error:', err);
         } finally {
             setLoading(false);
         }
@@ -73,7 +76,7 @@ const Login = () => {
                             <span className="text-4xl font-bold text-white">₿</span>
                         </div>
                         <h1 className="text-3xl font-bold text-white mb-2">Bienvenido</h1>
-                        <p className="text-muted">Gestiona tus finanzas para tu aventura en Praga</p>
+                        <p className="text-muted">Gestiona tus finanzas de manera inteligente</p>
                     </div>
 
                     {/* Card */}
@@ -112,7 +115,12 @@ const Login = () => {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-muted">Contraseña</label>
+                                    <div className="flex justify-between items-center">
+                                        <label className="block text-sm font-medium text-muted">Contraseña</label>
+                                        <Link to="/forgot-password" className="text-xs text-accent-primary hover:text-indigo-400 transition-colors">
+                                            ¿Olvidaste tu contraseña?
+                                        </Link>
+                                    </div>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                             <svg className="w-5 h-5 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -155,15 +163,6 @@ const Login = () => {
                                     </Link>
                                 </p>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Prague info */}
-                    <div className="mt-8 text-center animate-fade-in" style={{ animationDelay: '0.2s' }}>
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-bg-secondary/50 border border-border-color/30 text-xs text-muted">
-                            <span>🇨🇿</span>
-                            <span>Preparando tu viaje a Praga</span>
-                            <span className="w-1.5 h-1.5 bg-accent-success rounded-full animate-pulse" />
                         </div>
                     </div>
                 </div>

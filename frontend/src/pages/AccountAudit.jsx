@@ -11,16 +11,22 @@ const AccountAudit = () => {
     const [loadingTx, setLoadingTx] = useState(false);
     const toast = useToast();
 
+    // Search
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState(null);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [isSearchMode, setIsSearchMode] = useState(false);
+
     // Filters
     const [filters, setFilters] = useState({
-        startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], // First day of month
-        endDate: new Date().toISOString().split('T')[0], // Today
-        type: 'all', // all, income, expense
+        startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
+        type: 'all',
         categoryId: ''
     });
 
     const [categories, setCategories] = useState([]);
-    const [viewMode, setViewMode] = useState('list'); // list, summary
+    const [viewMode, setViewMode] = useState('list');
 
     useEffect(() => {
         loadInitialData();
@@ -74,6 +80,44 @@ const AccountAudit = () => {
         } finally {
             setLoadingTx(false);
         }
+    };
+
+    const handleSearch = async (e) => {
+        e?.preventDefault();
+        
+        if (!searchQuery.trim()) {
+            setIsSearchMode(false);
+            setSearchResults(null);
+            return;
+        }
+        
+        setSearchLoading(true);
+        setIsSearchMode(true);
+        
+        try {
+            const params = new URLSearchParams({
+                q: searchQuery,
+                per_page: '100'
+            });
+            
+            if (filters.startDate) params.append('start_date', filters.startDate);
+            if (filters.endDate) params.append('end_date', filters.endDate);
+            if (filters.type !== 'all') params.append('type', filters.type);
+            if (filters.categoryId) params.append('category_id', filters.categoryId);
+            
+            const data = await api.get(`/transactions/search?${params.toString()}`);
+            setSearchResults(data);
+        } catch (error) {
+            toast.error('Error en la búsqueda');
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
+    const clearSearch = () => {
+        setSearchQuery('');
+        setIsSearchMode(false);
+        setSearchResults(null);
     };
 
     const formatCurrency = (val, currency = 'COP') => {
@@ -143,12 +187,61 @@ const AccountAudit = () => {
                     <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent-primary">
                         Auditoría de Cuentas
                     </h1>
+
+            {/* Global Search Bar */}
+            <div className="mt-4">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                    <div className="relative flex-1">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Buscar en todas las transacciones... (descripción, categoría, cuenta)"
+                            className="w-full bg-bg-tertiary text-white rounded-xl pl-10 pr-4 py-2.5 border border-border-color/30 focus:border-accent-primary/50 focus:outline-none text-sm"
+                        />
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        {searchQuery && (
+                            <button
+                                type="button"
+                                onClick={clearSearch}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-white"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                    <button 
+                        type="submit" 
+                        disabled={searchLoading}
+                        className="btn btn-secondary px-4"
+                    >
+                        {searchLoading ? (
+                            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                        ) : 'Buscar'}
+                    </button>
+                </form>
+                {isSearchMode && searchResults && (
+                    <div className="mt-2 text-sm text-muted">
+                        {searchResults.total} resultado(s) encontrado(s) para "{searchQuery}"
+                        <button onClick={clearSearch} className="ml-2 text-accent-primary hover:underline">
+                            Limpiar búsqueda
+                        </button>
+                    </div>
+                )}
+            </div>
                     <p className="text-muted text-sm mt-1">Analiza los movimientos de cada cuenta en detalle</p>
                 </div>
             </div>
 
             {/* Account Selector Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                 {accounts.map(acc => (
                     <button
                         key={acc.id}
@@ -204,22 +297,22 @@ const AccountAudit = () => {
                 <>
                     {/* Filters Section */}
                     <div className="card">
-                        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+                        <div className="space-y-4">
                             {/* Quick Date Filters */}
-                            <div className="flex-1">
+                            <div>
                                 <label className="block text-xs text-muted mb-2 uppercase tracking-wider font-semibold">Período Rápido</label>
                                 <div className="flex flex-wrap gap-2">
                                     {[
                                         { id: 'today', label: 'Hoy' },
-                                        { id: 'week', label: 'Esta Semana' },
-                                        { id: 'month', label: 'Este Mes' },
+                                        { id: 'week', label: 'Semana' },
+                                        { id: 'month', label: 'Mes' },
                                         { id: 'quarter', label: 'Trimestre' },
-                                        { id: 'year', label: 'Este Año' }
+                                        { id: 'year', label: 'Año' }
                                     ].map(range => (
                                         <button
                                             key={range.id}
                                             onClick={() => setQuickDateRange(range.id)}
-                                            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-bg-tertiary border border-border-color/50 text-muted hover:text-white hover:border-accent-primary/50 hover:bg-accent-primary/10 transition-all"
+                                            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-bg-tertiary border border-border-color/50 text-muted hover:text-white hover:border-accent-primary/50 hover:bg-accent-primary/10 transition-all flex-1 sm:flex-none min-w-[60px]"
                                         >
                                             {range.label}
                                         </button>
@@ -227,55 +320,58 @@ const AccountAudit = () => {
                                 </div>
                             </div>
 
-                            {/* Custom Date Range */}
-                            <div className="flex gap-3">
+                            {/* Filter Row */}
+                            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                {/* From Date */}
                                 <div>
                                     <label className="block text-xs text-muted mb-2">Desde</label>
                                     <input
                                         type="date"
                                         value={filters.startDate}
                                         onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                                        className="px-3 py-2 text-sm bg-bg-tertiary rounded-lg border border-border-color/50"
+                                        className="w-full px-3 py-2 text-sm bg-bg-tertiary rounded-lg border border-border-color/50"
                                     />
                                 </div>
+                                
+                                {/* To Date */}
                                 <div>
                                     <label className="block text-xs text-muted mb-2">Hasta</label>
                                     <input
                                         type="date"
                                         value={filters.endDate}
                                         onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                                        className="px-3 py-2 text-sm bg-bg-tertiary rounded-lg border border-border-color/50"
+                                        className="w-full px-3 py-2 text-sm bg-bg-tertiary rounded-lg border border-border-color/50"
                                     />
                                 </div>
-                            </div>
 
-                            {/* Type Filter */}
-                            <div>
-                                <label className="block text-xs text-muted mb-2">Tipo</label>
-                                <select
-                                    value={filters.type}
-                                    onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-                                    className="px-3 py-2 text-sm bg-bg-tertiary rounded-lg border border-border-color/50"
-                                >
-                                    <option value="all">Todos</option>
-                                    <option value="income">Ingresos</option>
-                                    <option value="expense">Gastos</option>
-                                </select>
-                            </div>
+                                {/* Type Filter */}
+                                <div>
+                                    <label className="block text-xs text-muted mb-2">Tipo</label>
+                                    <select
+                                        value={filters.type}
+                                        onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+                                        className="w-full px-3 py-2 text-sm bg-bg-tertiary rounded-lg border border-border-color/50"
+                                    >
+                                        <option value="all">Todos</option>
+                                        <option value="income">Ingresos</option>
+                                        <option value="expense">Gastos</option>
+                                    </select>
+                                </div>
 
-                            {/* Category Filter */}
-                            <div>
-                                <label className="block text-xs text-muted mb-2">Categoría</label>
-                                <select
-                                    value={filters.categoryId}
-                                    onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}
-                                    className="px-3 py-2 text-sm bg-bg-tertiary rounded-lg border border-border-color/50 min-w-[150px]"
-                                >
-                                    <option value="">Todas</option>
-                                    {categories.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                    ))}
-                                </select>
+                                {/* Category Filter */}
+                                <div>
+                                    <label className="block text-xs text-muted mb-2">Categoría</label>
+                                    <select
+                                        value={filters.categoryId}
+                                        onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}
+                                        className="w-full px-3 py-2 text-sm bg-bg-tertiary rounded-lg border border-border-color/50"
+                                    >
+                                        <option value="">Todas</option>
+                                        {categories.map(cat => (
+                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -332,7 +428,58 @@ const AccountAudit = () => {
                         </button>
                     </div>
 
-                    {viewMode === 'list' ? (
+                    {/* Search Results */}
+                    {isSearchMode && searchResults ? (
+                        <div className="card">
+                            <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                Resultados de Búsqueda
+                            </h3>
+                            {searchResults.transactions.length === 0 ? (
+                                <div className="text-center py-12 text-muted">
+                                    <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <p>No se encontraron transacciones para "{searchQuery}"</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="text-left text-xs text-muted border-b border-border-color/30">
+                                                <th className="pb-3 font-medium">Fecha</th>
+                                                <th className="pb-3 font-medium">Descripción</th>
+                                                <th className="pb-3 font-medium">Cuenta</th>
+                                                <th className="pb-3 font-medium">Categoría</th>
+                                                <th className="pb-3 font-medium text-right">Monto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border-color/20">
+                                            {searchResults.transactions.map(tx => (
+                                                <tr key={tx.id} className="hover:bg-bg-tertiary/30 transition-colors">
+                                                    <td className="py-3 text-sm text-muted">{formatDate(tx.date)}</td>
+                                                    <td className="py-3">
+                                                        <p className="font-medium text-white">{tx.description || '-'}</p>
+                                                    </td>
+                                                    <td className="py-3 text-sm text-muted">{tx.account_name}</td>
+                                                    <td className="py-3">
+                                                        <span className="px-2 py-0.5 text-xs rounded-full bg-bg-tertiary text-muted">
+                                                            {tx.category_name || 'Sin categoría'}
+                                                        </span>
+                                                    </td>
+                                                    <td className={`py-3 text-right font-bold ${tx.amount >= 0 ? 'text-accent-success' : 'text-accent-danger'}`}>
+                                                        {tx.amount >= 0 ? '+' : ''}{formatCurrency(tx.amount)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    ) : viewMode === 'list' ? (
                         /* Transactions List */
                         <div className="card">
                             {loadingTx ? (

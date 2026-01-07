@@ -18,7 +18,10 @@ const Register = () => {
             setSuccess(true);
             setTimeout(() => navigate('/login'), 1500);
         } catch (err) {
-            setError(err.msg || 'Error al crear la cuenta');
+            // Handle error message - could be err.message or err.msg or err.data.msg
+            const errorMessage = err.message || err.msg || (err.data && err.data.msg) || 'Error al crear la cuenta';
+            setError(errorMessage);
+            console.error('Register error:', err);
         } finally {
             setLoading(false);
         }
@@ -69,7 +72,7 @@ const Register = () => {
                             <span className="text-4xl font-bold text-white">✦</span>
                         </div>
                         <h1 className="text-3xl font-bold text-white mb-2">Crear Cuenta</h1>
-                        <p className="text-muted">Comienza a planificar tu aventura en Praga</p>
+                        <p className="text-muted">Comienza a gestionar tus finanzas</p>
                     </div>
 
                     {/* Card */}

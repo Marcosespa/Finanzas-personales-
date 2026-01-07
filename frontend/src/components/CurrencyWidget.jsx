@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../services/api';
+import { formatNumberWithThousands, parseFormattedNumber } from '../utils/currency';
 
 const CurrencyWidget = ({ onConvert }) => {
     const [amount, setAmount] = useState('');
@@ -7,6 +9,8 @@ const CurrencyWidget = ({ onConvert }) => {
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
     const [showQuickRates, setShowQuickRates] = useState(true);
+    const [ratesInfo, setRatesInfo] = useState({ source: 'fallback', lastUpdated: null });
+    const [refreshing, setRefreshing] = useState(false);
 
     const currencies = [
         { code: 'COP', name: 'Peso Colombiano', symbol: '$', flag: '🇨🇴' },
@@ -15,23 +19,7 @@ const CurrencyWidget = ({ onConvert }) => {
         { code: 'CZK', name: 'Corona Checa', symbol: 'Kč', flag: '🇨🇿' }
     ];
 
-    // Tasas aproximadas actualizadas (Enero 2026)
-    const mockRates = {
-        'COP_EUR': 0.000225,
-        'COP_USD': 0.000240,
-        'COP_CZK': 0.00565,
-        'EUR_COP': 4450,
-        'EUR_USD': 1.08,
-        'EUR_CZK': 25.1,
-        'USD_COP': 4170,
-        'USD_EUR': 0.93,
-        'USD_CZK': 23.3,
-        'CZK_COP': 177,
-        'CZK_EUR': 0.0398,
-        'CZK_USD': 0.043
-    };
-
-    // Quick conversion presets relevantes para estudiante en Praga
+    // Quick conversion presets
     const quickAmounts = {
         COP: [50000, 100000, 500000, 1000000],
         EUR: [10, 50, 100, 500],
@@ -39,32 +27,57 @@ const CurrencyWidget = ({ onConvert }) => {
         CZK: [100, 500, 1000, 5000]
     };
 
+    // Load rates info on mount
+    useEffect(() => {
+        loadRatesInfo();
+    }, []);
+
+    const loadRatesInfo = async () => {
+        try {
+            const res = await api.get('/exchange-rates/');
+            setRatesInfo({
+                source: res.source,
+                lastUpdated: res.last_updated
+            });
+        } catch (e) {
+            console.error('Error loading rates info:', e);
+        }
+    };
+
     const handleConvert = async (customAmount = null) => {
-        const amountToConvert = customAmount || amount;
-        if (!amountToConvert || amountToConvert <= 0) return;
+        const amountToConvert = customAmount || parseFormattedNumber(amount);
+        if (!amountToConvert || parseFloat(amountToConvert) <= 0) return;
 
         setLoading(true);
         try {
-            // Simular pequeño delay de API
-            await new Promise(resolve => setTimeout(resolve, 300));
-
-            const key = `${fromCurrency}_${toCurrency}`;
-            const rate = mockRates[key] || 1;
-            const converted = parseFloat(amountToConvert) * rate;
-
+            const res = await api.get(`/exchange-rates/convert?from=${fromCurrency}&to=${toCurrency}&amount=${amountToConvert}`);
+            
             setResult({
-                original: parseFloat(amountToConvert),
-                converted: converted,
-                rate: rate
+                original: res.amount,
+                converted: res.converted,
+                rate: res.rate,
+                source: res.source
             });
 
             if (customAmount) {
-                setAmount(customAmount.toString());
+                setAmount(formatNumberWithThousands(customAmount.toString(), fromCurrency));
             }
         } catch (error) {
             console.error('Conversion error:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleRefreshRates = async () => {
+        setRefreshing(true);
+        try {
+            await api.post('/exchange-rates/refresh');
+            await loadRatesInfo();
+        } catch (e) {
+            console.error('Error refreshing rates:', e);
+        } finally {
+            setRefreshing(false);
         }
     };
 
@@ -86,24 +99,62 @@ const CurrencyWidget = ({ onConvert }) => {
         });
     };
 
+    const formatLastUpdated = () => {
+        if (!ratesInfo.lastUpdated) return null;
+        const date = new Date(ratesInfo.lastUpdated);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) return 'ahora';
+        if (diffMins < 60) return `hace ${diffMins}m`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `hace ${diffHours}h`;
+        return date.toLocaleDateString('es-CO');
+    };
+
     return (
         <div className="card bg-gradient-to-br from-bg-secondary via-[#151b2e] to-bg-secondary border border-border-color/50 hover:border-accent-primary/30 transition-all duration-300 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <div>
-                        <h3 className="font-bold text-white">Conversor</h3>
-                        <p className="text-[10px] text-muted">COP ↔ CZK • EUR • USD</p>
+                    <div className="min-w-0">
+                        <h3 className="font-bold text-white text-sm sm:text-base">Conversor</h3>
+                        <p className="text-[9px] sm:text-[10px] text-muted">COP ↔ CZK • EUR • USD</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-accent-success/10 border border-accent-success/20">
-                    <span className="w-1.5 h-1.5 bg-accent-success rounded-full animate-pulse" />
-                    <span className="text-[10px] text-accent-success">Live</span>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleRefreshRates}
+                        disabled={refreshing}
+                        className="p-1.5 rounded-lg bg-bg-tertiary/50 hover:bg-bg-tertiary text-muted hover:text-white transition-all"
+                        title="Actualizar tasas"
+                    >
+                        <svg className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full border flex-shrink-0 ${
+                        ratesInfo.source === 'live' 
+                            ? 'bg-accent-success/10 border-accent-success/20' 
+                            : 'bg-accent-warning/10 border-accent-warning/20'
+                    }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                            ratesInfo.source === 'live' 
+                                ? 'bg-accent-success animate-pulse' 
+                                : 'bg-accent-warning'
+                        }`} />
+                        <span className={`text-[9px] sm:text-[10px] ${
+                            ratesInfo.source === 'live' ? 'text-accent-success' : 'text-accent-warning'
+                        }`}>
+                            {ratesInfo.source === 'live' ? 'Live' : 'Offline'}
+                        </span>
+                    </div>
                 </div>
             </div>
 
@@ -117,7 +168,17 @@ const CurrencyWidget = ({ onConvert }) => {
                             <span className="text-lg">{getCurrencyInfo(fromCurrency)?.flag}</span>
                             <select
                                 value={fromCurrency}
-                                onChange={(e) => { setFromCurrency(e.target.value); setResult(null); }}
+                                onChange={(e) => { 
+                                    const newCurrency = e.target.value;
+                                    setFromCurrency(newCurrency); 
+                                    setResult(null);
+                                    if (amount) {
+                                        const parsed = parseFormattedNumber(amount);
+                                        if (parsed) {
+                                            setAmount(formatNumberWithThousands(parsed, newCurrency));
+                                        }
+                                    }
+                                }}
                                 className="bg-transparent border-none p-0 text-sm font-semibold text-white focus:ring-0 cursor-pointer"
                             >
                                 {currencies.map(c => (
@@ -162,11 +223,20 @@ const CurrencyWidget = ({ onConvert }) => {
                         <span className="text-muted font-medium">{getCurrencyInfo(fromCurrency)?.symbol}</span>
                     </div>
                     <input
-                        type="number"
+                        type="text"
                         value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            const cleaned = value.replace(/[^\d.]/g, '');
+                            if (cleaned === '' || cleaned === '.') {
+                                setAmount('');
+                                return;
+                            }
+                            const formatted = formatNumberWithThousands(cleaned, fromCurrency);
+                            setAmount(formatted);
+                        }}
                         onKeyPress={(e) => e.key === 'Enter' && handleConvert()}
-                        placeholder="0.00"
+                        placeholder="0"
                         className="w-full pl-10 pr-4 py-3 text-lg font-semibold bg-bg-tertiary/30 border border-border-color/30 rounded-xl focus:border-accent-primary/50 focus:ring-2 focus:ring-accent-primary/10"
                     />
                 </div>
@@ -224,29 +294,41 @@ const CurrencyWidget = ({ onConvert }) => {
                                 </p>
                             </div>
                         </div>
+                        {result.source && (
+                            <p className="text-[9px] text-muted mt-2 text-right">
+                                Tasa: {result.source === 'live' ? 'Tiempo real' : 'Aproximada (COP no soportado por BCE)'}
+                            </p>
+                        )}
                     </div>
                 )}
 
-                {/* Quick Reference Rates */}
+                {/* Quick Reference & Last Updated */}
                 <div className="pt-3 border-t border-border-color/30">
-                    <button 
-                        onClick={() => setShowQuickRates(!showQuickRates)}
-                        className="flex items-center justify-between w-full text-xs text-muted hover:text-white transition-colors"
-                    >
-                        <span>Tasas de referencia para Praga</span>
-                        <svg className={`w-4 h-4 transition-transform ${showQuickRates ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
+                    <div className="flex justify-between items-center">
+                        <button 
+                            onClick={() => setShowQuickRates(!showQuickRates)}
+                            className="flex items-center gap-1 text-xs text-muted hover:text-white transition-colors"
+                        >
+                            <span>Tasas de referencia</span>
+                            <svg className={`w-4 h-4 transition-transform ${showQuickRates ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {ratesInfo.lastUpdated && (
+                            <span className="text-[9px] text-muted">
+                                Actualizado {formatLastUpdated()}
+                            </span>
+                        )}
+                    </div>
                     {showQuickRates && (
                         <div className="mt-3 grid grid-cols-2 gap-2 animate-fade-in">
                             <div className="p-2 rounded-lg bg-bg-tertiary/30 text-center">
                                 <p className="text-[10px] text-muted">COP → CZK</p>
-                                <p className="text-sm font-semibold text-white">1M = 5,650 Kč</p>
+                                <p className="text-sm font-semibold text-white">1M ≈ 5.700 Kč</p>
                             </div>
                             <div className="p-2 rounded-lg bg-bg-tertiary/30 text-center">
-                                <p className="text-[10px] text-muted">EUR → CZK</p>
-                                <p className="text-sm font-semibold text-white">1€ = 25.1 Kč</p>
+                                <p className="text-[10px] text-muted">CZK → COP</p>
+                                <p className="text-sm font-semibold text-white">1 Kč ≈ 175 COP</p>
                             </div>
                         </div>
                     )}
