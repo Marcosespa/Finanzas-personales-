@@ -1,4 +1,4 @@
-#!/Users/marcosespana/Desktop/ManejadorFinanzas/backend/venv/bin/python3
+#!/home/marcos/Escritorio/Finanzas-personales-/backend/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
