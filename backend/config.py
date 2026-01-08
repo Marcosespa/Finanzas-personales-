@@ -10,7 +10,7 @@ class Config:
     JWT_HEADER_NAME = 'Authorization'
     JWT_HEADER_TYPE = 'Bearer'
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(basedir, 'finance.db')
+        'postgresql://finanzas_user:Finanzas2026!@satrack_db:5432/finanzaspersonales_db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # CORS Configuration for development

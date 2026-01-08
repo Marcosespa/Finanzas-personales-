@@ -9,10 +9,8 @@ services:
     environment:
       - FLASK_ENV=production
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-super-secret-jwt-key-change-in-production}
-      # Usar PostgreSQL (descomenta la siguiente línea y comenta la de SQLite):
-      # - DATABASE_URL=postgresql://finanzas_user:Finanzas2026!@host.docker.internal:5432/finanzaspersonales_db
-      # Usar SQLite (por defecto):
-      - DATABASE_URL=${DATABASE_URL:-sqlite:///instance/finance.db}
+      # Usar PostgreSQL (configurado)
+      - DATABASE_URL=${DATABASE_URL:-postgresql://finanzas_user:Finanzas2026!@satrack_db:5432/finanzaspersonales_db}
     volumes:
       # Persist SQLite database
       - backend_data:/app/instance
@@ -20,6 +18,7 @@ services:
       - "5000:5000"
     networks:
       - finanzas-network
+      - satrack-network
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/auth/health')"]
       interval: 30s
@@ -33,9 +32,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Backend está corriendo directamente en el host
-        # Usar IP del servidor para acceso desde otros dispositivos en la red
-        - VITE_API_URL=${VITE_API_URL:-http://192.168.1.19:5000}
+        # Usar ruta relativa para que nginx haga proxy al backend
+        # Esto evita problemas de firewall y permite usar solo el puerto 80
+        - VITE_API_URL=${VITE_API_URL:-/api}
     container_name: finanzas-frontend
     restart: unless-stopped
     ports:
@@ -53,6 +52,9 @@ services:
 networks:
   finanzas-network:
     driver: bridge
+  satrack-network:
+    external: true
+    name: webscrapper_satrack_network
 
 volumes:
   backend_data:
