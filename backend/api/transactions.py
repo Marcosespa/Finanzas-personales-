@@ -288,12 +288,28 @@ def delete_transaction(id):
     
     if not tx:
         return jsonify({"msg": "Transaction not found"}), 404
+    
+    # Prevent deleting a child transaction directly (must delete parent)
+    if tx.parent_id is not None:
+        return jsonify({"msg": "Cannot delete a split child transaction. Delete the parent transaction instead."}), 400
         
     try:
-        # If it's a split parent, children cascade delete? 
-        # SQLAlchemy cascade="all, delete-orphan" should handle children if configured.
-        # If it's a child, we just delete it? Logic depends on how strict splits are. 
-        # For now, simple delete.
+        # Get account before deletion
+        account = Account.query.get(tx.account_id)
+        
+        # Delete children first (if it's a split parent)
+        # Since cascade doesn't include delete, we need to delete manually
+        if tx.children:
+            for child in tx.children:
+                db.session.delete(child)
+        
+        # Revert balance: only for main transactions (parent_id is None)
+        # Split children don't affect balance, only the parent does
+        # IMPORTANT: Revert the amount that was added when transaction was created
+        if tx.parent_id is None and account:
+            account.balance -= tx.amount
+        
+        # Now delete the main transaction
         db.session.delete(tx)
         db.session.commit()
         return jsonify({"msg": "Transaction deleted"}), 200

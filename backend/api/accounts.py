@@ -375,3 +375,60 @@ def get_account_summary(id):
         "period_type": period,
         "data": result
     }), 200
+
+@accounts_bp.route('/recalculate-balances', methods=['POST'])
+@jwt_required()
+def recalculate_balances():
+    """
+    Recalcula los balances de todas las cuentas del usuario
+    basándose en las transacciones existentes.
+    Útil cuando los balances están desincronizados.
+    """
+    user_id = get_jwt_identity()
+    from models import Transaction
+    from sqlalchemy import func
+    
+    try:
+        # Obtener todas las cuentas del usuario
+        accounts = Account.query.filter_by(user_id=user_id, deleted_at=None).all()
+        
+        updated_accounts = []
+        
+        for account in accounts:
+            # Calcular el balance correcto: suma de todas las transacciones principales
+            # Solo transacciones principales (parent_id is None)
+            # Incluye transfers porque ambos afectan el balance correctamente
+            result = db.session.query(
+                func.coalesce(func.sum(Transaction.amount), 0.0)
+            ).filter(
+                Transaction.account_id == account.id,
+                Transaction.parent_id.is_(None),  # Solo transacciones principales
+                Transaction.deleted_at.is_(None)   # No incluir eliminadas
+            ).scalar()
+            
+            old_balance = account.balance
+            new_balance = float(result) if result else 0.0
+            
+            # Actualizar el balance
+            account.balance = new_balance
+            
+            if abs(old_balance - new_balance) > 0.01:  # Solo reportar si hubo cambio significativo
+                updated_accounts.append({
+                    "id": account.id,
+                    "name": account.name,
+                    "old_balance": old_balance,
+                    "new_balance": new_balance,
+                    "difference": new_balance - old_balance
+                })
+        
+        db.session.commit()
+        
+        return jsonify({
+            "msg": f"Balances recalculados para {len(accounts)} cuentas",
+            "updated_count": len(updated_accounts),
+            "updated_accounts": updated_accounts
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"msg": "Error al recalcular balances", "error": str(e)}), 500
